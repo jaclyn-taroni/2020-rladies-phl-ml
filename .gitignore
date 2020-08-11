@@ -37,3 +37,9 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+
+# Pre-filtering/collapsing OpenPBTA files
+data/pbta-vst-stranded.tsv.gz
+data/pbta-histologies-stranded-rnaseq.tsv.gz
+
