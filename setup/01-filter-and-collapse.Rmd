@@ -1,0 +1,202 @@
+---
+title: "Filter and collapse medulloblastoma OpenPBTA data"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+date: 2020
+---
+
+_Adapted from [Childhood Cancer Data Lab, Alex's Lemonade Stand Foundation training materials](https://github.com/AlexsLemonade/training-modules/tree/ddc9c76e03aaf147fb2f011490ea6aec835de064)._
+_See [this notebook](https://htmlpreview.github.io/?https://github.com/AlexsLemonade/training-modules/blob/ddc9c76e03aaf147fb2f011490ea6aec835de064/machine-learning/03-openpbta_PLIER.nb.html) in particular!_
+
+## Set up
+
+### Libraries
+
+```{r}
+library(tidyverse)
+```
+
+### Directories and files
+
+#### Directories
+
+```{r directories}
+# Directory that holds the metadata and RNA-seq
+data_dir <- file.path("..", "data")
+```
+
+#### Input files
+
+```{r input_files}
+# Metadata
+histologies_file <- file.path(data_dir, 
+                              "pbta-histologies-stranded-rnaseq.tsv.gz")
+# VST transformed RNA-seq data
+rnaseq_file <- file.path(data_dir, "pbta-vst-stranded.tsv.gz")
+```
+
+#### Output file
+
+```{r output_files}
+# Metadata file that only contains relevant columns and medulloblastoma 
+# samples
+medullo_histologies_file <- file.path(data_dir,
+                                      "pbta-medullo-histologies.tsv.gz")
+# RNA-seq file with duplicate gene identifiers collapsed
+collapsed_data_file <- file.path(data_dir, "pbta-medullo-vst-collapsed.tsv.gz")
+```
+
+## Read in and prepare data
+
+### Read in sample metadata and identify medulloblastoma samples
+
+In the interest of reducing runtime and resource requirements during the workshop, we're going to subset the dataset to only the medulloblastoma samples.
+
+```{r read_in_metadata}
+# Read in metadata
+histologies_df <- read_tsv(histologies_file)
+```
+
+Filter only to the medulloblastoma samples and columns we will use in the workshop.
+
+```{r filter_to_medullo}
+# Filter only to relevant samples and columns + write to file
+medulloblastoma_df <- histologies_df %>%
+  filter(short_histology == "Medulloblastoma") %>%
+  select(Kids_First_Biospecimen_ID, 
+         short_histology, 
+         broad_histology,
+         tumor_descriptor, 
+         molecular_subtype) %>%
+  write_tsv(medullo_histologies_file)
+
+# Get biospecimen identifiers for medulloblastoma samples that we'll use to
+# subset the RNA-seq data
+medulloblastoma_samples <- medulloblastoma_df %>%
+  pull(Kids_First_Biospecimen_ID)
+```
+
+### Read in expression data
+
+Read in the VST transformed RNA-seq data.
+
+```{r read_in_rnaseq}
+rnaseq_df <- read_tsv(rnaseq_file)
+```
+
+The `gene_id` column concatenates two different gene identifiers: Ensembl gene IDs and gene symbols.
+The Pathway-Level Information ExtractoR (PLIER) ([Mao *et al.* (2019)](https://doi.org/10.1038/s41592-019-0456-1)) method we'll use as part of the workshop requires gene symbols as rownames, so we will need to take some steps to prepare this data for use with PLIER.
+
+First, we need to separate the gene symbols from the Ensembl gene identifiers.
+Luckily, there's a tidyverse function that can separate one column into multiple columns called `tidyr::separate()`.
+
+```{r separate_gene_ids}
+symbol_rnaseq_df <- rnaseq_df %>%
+  tidyr::separate(gene_id,  # Take the gene_id column
+                  # Create two new columns called ensembl_id and gene_symbol
+                  into = c("ensembl_id", "gene_symbol"),
+                  # The values for these two columns are separated by _
+                  sep = "_",
+                  # Some gene symbols themselves contain _, so when that happens
+                  # merge everything after the first _ into the gene_symbol
+                  # column
+                  extra = "merge")
+
+# We no longer need the data frame we read in, so we'll remove it to save some
+# memory
+rm(rnaseq_df)
+```
+
+Alright, what does our new data frame look like?
+
+```{r head_symbol_df}
+head(symbol_rnaseq_df)
+```
+
+We won't need the column with the Ensembl identifiers anymore, so let's remove it.
+
+```{r remove_ensg}
+symbol_rnaseq_df <- symbol_rnaseq_df %>%
+  select(-ensembl_id)
+```
+
+### Collapsing duplicate gene symbols
+
+```{r any_duplicated}
+any(duplicated(symbol_rnaseq_df$gene_symbol))
+```
+
+How many duplicated gene symbols are there?
+
+```{r how_many_duplicated}
+sum(duplicated(symbol_rnaseq_df$gene_symbol))
+```
+
+Relative to the total number of genes, there are not too many genes that are duplicated.
+
+```{r add_row_means}
+# mean transformed value across the entire cohort
+symbol_rnaseq_df$mean_value <- rowMeans(symbol_rnaseq_df[, -1])
+```
+
+We'll use a few gene symbols that we've arbitrarily selected to follow along with these processing steps!
+
+```{r duplicated_examples}
+# Genes we will use to illustrate what happens during the collapsing duplicate
+# process
+duplicated_symbols <- c("DGCR5", "RABGEF1")
+
+# Let's take a look at the mean values prior to any filtering
+symbol_rnaseq_df %>% 
+  filter(gene_symbol %in% duplicated_symbols) %>%
+  select(gene_symbol, mean_value) %>%
+  arrange(gene_symbol)
+```
+
+For a given duplicated gene symbol, we want to select the row with the highest average expression value.
+
+```{r collapsed_rnaseq}
+# There's sampling in the case of ties, so set a seed for reproducibility
+set.seed(2020)
+
+collapsed_rnaseq_df <- symbol_rnaseq_df %>%
+  # For each set of rows that correspond to the same gene symbol
+  group_by(gene_symbol) %>%
+  # Select the single row with the highest value in the mean_value column
+  top_n(1, mean_value) %>%
+  # In the case of ties, where the mean values are the same, randomly pick one
+  # row
+  sample_n(1)
+```
+
+Check again to see if any duplicated gene symbols remain in the new collapsed data frame.
+
+```{r any_duplicated_now}
+any(duplicated(collapsed_rnaseq_df$gene_symbol))
+```
+
+Which row for our gene symbols of interest was retained in the collapsed data frame?
+
+```{r which_retained}
+collapsed_rnaseq_df %>% 
+  filter(gene_symbol %in% duplicated_symbols) %>%
+  select(gene_symbol, mean_value) %>%
+  arrange(gene_symbol)
+```
+
+Now we're ready to remove the extraneous column with our mean values and only our medulloblastoma samples and write to file.
+
+```{r write_collapsed}
+collapsed_rnaseq_df %>%
+  select(gene_symbol, tidyselect::all_of(medulloblastoma_samples)) %>%
+  write_tsv(collapsed_data_file)
+```
+
+## Session Info
+
+```{r}
+sessionInfo()
+```
+
