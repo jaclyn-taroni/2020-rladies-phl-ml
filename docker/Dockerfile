@@ -33,7 +33,8 @@ RUN install2.r --error --deps TRUE \
     styler \
     pheatmap \
     Rtsne \
-    umap
+    umap \
+    caret
 
 ##########################
 # Install bioconductor packages
