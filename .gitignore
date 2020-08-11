@@ -43,3 +43,8 @@ vignettes/*.pdf
 data/pbta-vst-stranded.tsv.gz
 data/pbta-histologies-stranded-rnaseq.tsv.gz
 
+
+# Related to development with Docker
+.rstudio
+.local/share/rstudio
+.config/rstudio
