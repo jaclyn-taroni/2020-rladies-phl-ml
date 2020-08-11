@@ -34,7 +34,8 @@ RUN install2.r --error --deps TRUE \
     pheatmap \
     Rtsne \
     umap \
-    caret
+    caret \
+    palmerpenguins
 
 ##########################
 # Install bioconductor packages
