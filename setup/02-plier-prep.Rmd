@@ -1,0 +1,122 @@
+---
+title: "Prepare PLIER model"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+date: 2020
+---
+
+_Adapted from Childhood Cancer Data Lab, Alex's Lemonade Stand Foundation [training materials](https://github.com/AlexsLemonade/training-modules/tree/ddc9c76e03aaf147fb2f011490ea6aec835de064)._
+
+## Set up
+
+```{r}
+# We'll need to set the seed for reproducibility
+seed <- 2020
+```
+
+### Libraries
+
+```{r}
+library(magrittr)
+library(readr)
+library(PLIER)
+```
+
+### Directories and files
+
+#### Directories
+
+```{r}
+# Directory that contains processed RNA-seq data
+data_dir <- file.path("..", "data")
+
+# We'll save the PLIER model to a directory called models
+models_dir <- file.path("..", "models")
+dir.create(models_dir, showWarnings = FALSE)
+```
+
+#### Input files
+
+We've performed variance-stabilizing transformation on RNA-seq data, collapsed the duplicate gene identifiers, and filtered to only medulloblastoma samples.
+See `README.md` and `01-filter-and-collapse.Rmd` for more information.
+
+```{r}
+rnaseq_file <- file.path(data_dir, "pbta-medullo-vst-collapsed.tsv.gz")
+```
+
+#### Output files
+
+We're going to save the PLIER model to the `models` directory.
+
+```{r}
+plier_file <- file.path(models_dir, "pbta-medullo-plier.RDS")
+```
+
+## Read in RNA-seq data
+
+```{r}
+medulloblastoma_rnaseq_df <- read_tsv(rnaseq_file)
+
+# We need to convert this to a matrix where the gene symbols are rownames
+medulloblastoma_rnaseq_mat <- medulloblastoma_rnaseq_df %>%
+  tibble::column_to_rownames("gene_symbol") %>%
+  as.matrix()
+```
+
+## PLIER
+
+### Pathway data
+
+The `PLIER` package comes with different gene sets we can use as input during training.
+The gene sets themselves are not really any different than other gene sets we might use for pathway analysis, but the data that comes in the package is in a format that is already compatible for use with PLIER.
+
+```{r plier_data}
+data("bloodCellMarkersIRISDMAP")
+data("canonicalPathways")
+data("svmMarkers")
+
+# Combine the pathway data from PLIER
+all_pathways <- PLIER::combinePaths(bloodCellMarkersIRISDMAP, 
+                                    canonicalPathways,
+                                    svmMarkers)
+```
+
+### Row normalize
+
+`PLIER` comes with a built-in function to row normalize the expression data.
+This is z-scoring the expression values for each gene.
+
+```{r row_normalize, live = TRUE}
+# Row normalize -- z-scoring the genes
+medulloblastoma_zscore <- PLIER::rowNorm(medulloblastoma_rnaseq_mat)
+```
+
+### Run PLIER
+
+```{r common_genes}
+# Identify genes that are common to the pathway data and the z-score mat
+common_genes <- PLIER::commonRows(all_pathways, medulloblastoma_zscore)
+```
+
+Now for the main PLIER function.
+
+```{r run_plier}
+plier_results <- PLIER::PLIER(data = medulloblastoma_zscore[common_genes, ],
+                              priorMat = all_pathways[common_genes, ],
+                              rseed = seed)
+```
+
+### Save to file
+
+```{r}
+plier_results %>% write_rds(plier_file)
+```
+
+## Session Info
+
+```{r}
+sessionInfo()
+```
+
