@@ -36,7 +36,8 @@ RUN install2.r --error --deps TRUE \
     umap \
     caret \
     palmerpenguins \
-    factoextra
+    factoextra \
+    NbClust
 
 ##########################
 # Install bioconductor packages
