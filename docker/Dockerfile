@@ -41,7 +41,7 @@ RUN install2.r --error --deps TRUE \
 
 ##########################
 # Install bioconductor packages
-RUN R -e "BiocManager::install(c('ComplexHeatmap', 'DESeq2'), update = FALSE)"
+RUN R -e "BiocManager::install(c('ComplexHeatmap', 'DESeq2', 'ConsensusClusterPlus'), update = FALSE)"
 
 # Packages from GitHub
 RUN R -e "remotes::install_github('clauswilke/colorblindr', ref = '1ac3d4d62dad047b68bb66c06cee927a4517d678', dependencies = TRUE)"
