@@ -33,6 +33,7 @@ RUN install2.r --error --deps TRUE \
     styler \
     pheatmap \
     Rtsne \
+    uwot \
     umap \
     caret \
     palmerpenguins \
