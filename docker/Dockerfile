@@ -35,7 +35,8 @@ RUN install2.r --error --deps TRUE \
     Rtsne \
     umap \
     caret \
-    palmerpenguins
+    palmerpenguins \
+    factoextra
 
 ##########################
 # Install bioconductor packages
