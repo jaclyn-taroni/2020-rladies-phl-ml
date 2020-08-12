@@ -44,5 +44,8 @@ RUN R -e "BiocManager::install(c('ComplexHeatmap', 'DESeq2'), update = FALSE)"
 # Packages from GitHub
 RUN R -e "remotes::install_github('clauswilke/colorblindr', ref = '1ac3d4d62dad047b68bb66c06cee927a4517d678', dependencies = TRUE)"
 
+# Package from URL
+RUN R -e "remotes::install_url('https://github.com/wgmao/PLIER/archive/v0.1.4.tar.gz')"
+
 # set final workdir for commands
 WORKDIR /home/rstudio
