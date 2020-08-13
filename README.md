@@ -25,6 +25,8 @@ We'll cover two notebooks during the workshop:
 
 To learn more about how we prepared data and results ahead of time, see [`setup/README.md`](setup/README.md).
 
+A PDF version of the slides is available [here](slides/2020-R-Ladies-Hands-On-ML.pdf).
+
 ### Docker image for post-workshop use
 
 We will use RStudio Cloud for this workshop, but remove the shared workspace after the conclusion of the workshop.
