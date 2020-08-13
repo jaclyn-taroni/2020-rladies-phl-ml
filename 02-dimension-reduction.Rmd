@@ -88,7 +88,7 @@ Fewer features is appealing from a computational resource standpoint!
 # Genes are now columns
 gene_variance <- matrixStats::colVars(rnaseq_mat)
 # We'll want to retain the top 10%
-variance_threshold <- quantile(gene_variance, 0.95)
+variance_threshold <- quantile(gene_variance, 0.9)
 # Filter to top 10%
 high_var_mat <- rnaseq_mat[, gene_variance > variance_threshold]
 ```
