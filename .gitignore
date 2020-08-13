@@ -38,7 +38,6 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 
-
 # Pre-filtering/collapsing OpenPBTA files
 data/pbta-vst-stranded.tsv.gz
 data/pbta-histologies-stranded-rnaseq.tsv.gz
@@ -47,6 +46,3 @@ data/pbta-histologies-stranded-rnaseq.tsv.gz
 .rstudio
 .local/share/rstudio
 .config/rstudio
-
-# File generated in first notebook
-data/pbta-medullo-transposed-high-variance.RDS
