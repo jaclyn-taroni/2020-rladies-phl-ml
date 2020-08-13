@@ -1,0 +1,234 @@
+---
+title: "Consensus clustering"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+date: 2020
+---
+
+_Adapted from Childhood Cancer Data Lab, Alex's Lemonade Stand Foundation [training materials](https://github.com/AlexsLemonade/training-modules/tree/ddc9c76e03aaf147fb2f011490ea6aec835de064)_
+
+## Background
+
+In this notebook, we'll cluster RNA-seq data from the Open Pediatric Brain Tumor Atlas (OpenPBTA) project and create a heatmap.
+OpenPBTA is a collaborative project organized by the CCDL and the Center for Data-Driven Discovery in Biomedicine (D3b) at the Children's Hospital of Philadelphia conducted openly on GitHub.
+
+You can read more about the project [here](https://github.com/alexslemonade/openpbta-analysis/#openpbta-analysis).
+
+We've downloaded the publicly available data from the project and have performed some transformation and filtering steps in preparation for the workshop. 
+You can find more information about these upstream processing steps in `setup/README.md`.
+
+In this workshop, we will use data from medulloblastoma samples.
+Medulloblastoma is the most common cancerous brain tumor in children ([ref](https://www.mayoclinic.org/diseases-conditions/medulloblastoma/cdc-20363524)) and there have been four subtypes identified in children ([ref](https://www.cancer.gov/rare-brain-spine-tumor/tumors/medulloblastoma)).
+
+If we want to identify groups or clusters using expression data, we often want to **validate** those groups in some way, such as determining the "correct" number of groups or checking for agreement within clusters.
+
+In this notebook, we'll use the medulloblastoma data from the OpenPBTA project to demonstrate a technique for cluster validation and look how clusters overlap with sample labels that are available in our metadata.
+
+## Set up
+
+### Libraries
+
+```{r libraries}
+library(tidyverse)
+# Consensus clustering library
+library(ConsensusClusterPlus)
+```
+
+### Files
+
+```{r}
+# Molecular subtype labels, etc.
+clinical_metadata_file <- file.path("data", 
+                                    "pbta-medullo-histologies.tsv.gz")
+
+# Processed RNA-seq data
+rnaseq_file <- file.path("data", "pbta-medullo-vst-collapsed.tsv.gz")
+
+```
+
+
+## Read in and prepare data
+
+Our sample metadata and the RNA-seq data we've processed ahead of time are stored in TSV files.
+
+```{r}
+clinical_df <- read_tsv(clinical_metadata_file)
+rnaseq_df <- read_tsv(rnaseq_file)
+```
+
+These RNA-seq data have already been transformed using variance-stabilizing transformation such that the variance is less dependent on the mean count values (which are influenced by factors such as the length or size of a gene) and the values should be on a more similar, log2-like scale. 
+Transformation like this is recommended when we are using clustering or distances.
+
+
+### Some notes on how expression data are stored
+
+Gene expression data are typically stored where rows are genes (features) and columns are samples.
+This is in contrast to many other applications, where rows are samples and columns are the features being measured.
+
+Here's an example from the [`palmerpenguins` package](https://allisonhorst.github.io/palmerpenguins/index.html).
+
+```{r}
+head(palmerpenguins::penguins)
+```
+
+And here's our RNA-seq data frame:
+
+```{r}
+head(rnaseq_df)
+```
+
+We'll sometimes want to transpose our RNA-seq data such that features are columns and rows are samples when working with "generic" packages.
+
+We're using a package (`ConsensusClusterPlus`) that is explicitly designed for working with gene expression or transcriptomics data, so this is the orientation that it expects.
+
+From the package documentation, the data to be clustered should be:
+
+> a data matrix where columns=items/samples and rows are features. For example, a gene expression matrix of genes in rows and microarrays in columns,
+
+One other thing you may have noticed about the penguins data is that there are categorical variables like species labels stored alongside the numeric features. 
+
+```{r}
+head(palmerpenguins::penguins)
+```
+
+When storing gene expression data in a tabular format, usually the sample attributes (e.g., disease type, any kind of sample label!) are stored _separately_.
+
+```{r}
+head(clinical_df)
+```
+
+Check that samples are in the same order using the biospecimen identifiers.
+
+```{r}
+identical(colnames(rnaseq_df)[-1], clinical_df$Kids_First_Biospecimen_ID)
+```
+
+We'll need a matrix for our next steps.
+
+```{r}
+rnaseq_mat <- rnaseq_df %>%
+  column_to_rownames("gene_symbol") %>%
+  as.matrix()
+```
+
+
+
+## Cluster validation
+
+### Consensus clustering
+
+The method we'll use to examine the stability of clusters is called consensus clustering.
+Consensus clustering aims to finds the "consensus" across multiple runs of the algorithm using a resampling procedure.
+
+We'll use the package [`ConsensusClusterPlus`](https://bioconductor.org/packages/release/bioc/html/ConsensusClusterPlus.html) that we loaded up top ([vignette](https://bioconductor.org/packages/release/bioc/vignettes/ConsensusClusterPlus/inst/doc/ConsensusClusterPlus.pdf)).
+
+The consensus clustering methodology was first introduced in [Monti *et al.* (2003)](https://doi.org/10.1023/A:1023949509487)
+Let's look at some simulated data and results from this publication to see what consensus clustering results look like in an ideal case where we know how many clusters there are!
+
+Consensus clustering outputs something called a _consensus index_ that tells us how often two samples are clustered together over multiple runs of the algorithm (0 = never, 1 = always).
+The consensus index values can be visualized in a consensus matrix.
+Here's a consensus matrix from simulated data with three groups. 
+Because this shows the relationship between samples, rows _and_ columns correspond to samples.
+A cell will be white if the consensus index = 0 and red if the consensus index = 1.
+
+![](https://github.com/AlexsLemonade/training-modules/raw/ddc9c76e03aaf147fb2f011490ea6aec835de064/machine-learning/diagrams/monti_gaussian3_consensus_matrix.png)
+
+There are 3 groups or clusters, represented by the 3 red blocks on the diagonal, of samples that always cluster together and never cluster with samples outside of that cluster.
+
+![](https://github.com/AlexsLemonade/training-modules/raw/ddc9c76e03aaf147fb2f011490ea6aec835de064/machine-learning/diagrams/monti_gaussian3_cdf_delta.png)
+
+We can also look at the cumulative distribution function (CDF) of the consensus matrix to get an idea of at what number of clusters (_k_) the CDF is maximized.
+The delta plot shoes use the relative increase in the CDF between _k_ and _k_ - 1. 
+Notice how there's a drop at _k_ = 3 in this simulated example.
+
+Next, let's look at a simulated example where there are 5 groups.
+
+![](https://github.com/AlexsLemonade/training-modules/raw/ddc9c76e03aaf147fb2f011490ea6aec835de064/machine-learning/diagrams/monti_gaussian5.png)
+
+Notice how the consensus matrix at _k_ = 5 looks "cleaner" than the one for _k_ = 4 and there appears to be an increase in the area under the CDF between _k_ = 4 and _k_ = 5.
+
+*All figures from [Monti et al. (2003)](https://doi.org/10.1023/A:1023949509487).*
+
+Consensus clustering is one way to help you determine the number of clusters in your data, but it is not the only methodology available. 
+Check out the Data Novia course [_Cluster Validation Essentials_ by Alboukadel Kassambara](https://www.datanovia.com/en/courses/cluster-validation-essentials/) for a deeper dive.
+
+```{r consensus_clustering}
+cc_results <- ConsensusClusterPlus(rnaseq_mat,
+                                   maxK = 15,
+                                   # Setting this seed is necessary for the 
+                                   # results to be reproducible
+                                   seed = 2020,
+                                   innerLinkage = "average",
+                                   finalLinkage = "average",
+                                   distance = "pearson")
+```
+
+Our results are not as clean as the simulated data (surprise, surprise)!
+We see an increase on the delta plot in several places: _k_ = 5, _k_ = 7, _k_ = 9, and _k_ = 12.
+
+If we look at the tracking plot that tells us how the samples group together and the consensus index plots, we can see 3 main clusters that arise around _k_ = 9 but we could also make an argument for the two groups that show up at _k_ 5 through 8.
+
+We'll move forward with the _k_ = 9 labels, but we hope you appreciate that determining the number clusters is not an easy problem!
+
+Let's take a look at the class labels for _k_ = 9.
+
+```{r cc_labels}
+# table() creates a contingency table of counts
+table(cc_results[[9]]$consensusClass)
+```
+
+(Note: the numbering of the clusters is arbitrary here.)
+
+A cluster of a few samples may not be that helpful in reaching our analysis goals!
+Now to extract the samples in the clusters of interest.
+
+```{r extract_cluster_labels}
+cc_cluster_labels <- cc_results[[9]]$consensusClass
+head(cc_cluster_labels)
+```
+
+
+
+### Compare clustering results to external metadata labels
+
+As mentioned at the top of the notebook, there are multiple medulloblastoma molecular subtypes The subtype classification largely relies on gene expression data.
+A [medulloblastoma subtype classifier](https://github.com/d3b-center/medullo-classifier-package), which is an example of _supervised machine learning_, has been applied to the medulloblastoma samples included in OpenPBTA.
+How do the subtype labels from this classifier (in the `molecular_subtype` column of our sample metadata) stack up to the clusters we identified with unsupervised methods?
+
+Let's first make a data frame that holds the subtype labels.
+We can use this to compare our unsupervised clustering results to the subtype labels.
+
+```{r subtype_df}
+subtype_df <- clinical_df %>%
+  select(Kids_First_Biospecimen_ID, molecular_subtype)
+```
+
+Add the consensus clustering labels.
+
+```{r subtype_cc}
+# Create a data frame that contains the consensus cluster results and join
+# it with the data frame of molecular subtype labels
+cc_df <- data.frame(cc_cluster_labels) %>%
+  rownames_to_column("Kids_First_Biospecimen_ID") %>%
+  inner_join(subtype_df, by = "Kids_First_Biospecimen_ID")
+```
+
+Do the consensus clustering results agree with the molecular subtype labels?
+
+```{r cc_subtype_table}
+table(cc_df$cc_cluster_labels, cc_df$molecular_subtype)
+```
+
+The subtype labels we have from the classifier largely agree with our unsupervised results, but it's not perfect.
+It's worth noting that the classifier uses different features than what we covered here. 
+
+In the next notebook, we'll look at other ways to examine the overall structure in our data!
+
+## Session Info
+
+```{r}
+sessionInfo()
+```
+
