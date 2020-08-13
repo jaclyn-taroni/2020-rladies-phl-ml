@@ -9,7 +9,7 @@ If you are a pediatric cancer researcher, you can sign up to be notified when ne
 We hope workshop participants come away with the following:
 
 * An understanding why it's useful to study transcriptomic data from tumors and how we can use unsupervised machine learning to reach our analysis goals
-* An intuition for some of the challenges for identifying groups of tumors that have similar molecular processes occuring at the time of collection
+* An intuition for some of the challenges for identifying groups of tumors that have similar molecular processes occurring at the time of collection
 * The beginnings of an intuition for different dimensionality reduction approaches uses for visualization
 * An idea of why we may want to use domain-specific approaches to learn low-dimensional representations of our data
 
