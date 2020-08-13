@@ -7,12 +7,14 @@ cran_packages <- c("remotes",
                    "uwot",
                    "umap",
                    "caret",
-                   "palmerpenguins")
+                   "palmerpenguins",
+                   "rmarkdown",
+                   "BiocManager",
+                   "tidyverse")
 install.packages(cran_packages)
 
 # Bioconductor
 BiocManager::install(c("ComplexHeatmap",
-                       "DESeq2",
                        "ConsensusClusterPlus"),
                      update = FALSE)
 
