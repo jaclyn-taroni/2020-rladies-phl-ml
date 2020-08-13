@@ -1,6 +1,6 @@
 # Hands-on Machine Learning Workshop for R-Ladies Philly
 
-These materials are adapted from Childhood Cancer Data Lab (CCDL), Alex's Lemonade Stand Foundation training materials that were developed by the CCDL Science Team (Chante Bethell, Candace Savonen, Josh Shapiro, and Jaclyn Taroni).
+These materials are adapted from Childhood Cancer Data Lab (CCDL), Alex's Lemonade Stand Foundation [training materials](https://github.com/AlexsLemonade/training-modules/tree/ddc9c76e03aaf147fb2f011490ea6aec835de064) that were developed by the CCDL Science Team (Chante Bethell, Candace Savonen, Josh Shapiro, and Jaclyn Taroni).
 
 If you are a pediatric cancer researcher, you can sign up to be notified when new workshops get scheduled here: https://www.ccdatalab.org/training
 
