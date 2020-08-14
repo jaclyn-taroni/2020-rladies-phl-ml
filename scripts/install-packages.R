@@ -10,7 +10,8 @@ cran_packages <- c("remotes",
                    "palmerpenguins",
                    "rmarkdown",
                    "BiocManager",
-                   "tidyverse")
+                   "tidyverse",
+                   "matrixStats")
 install.packages(cran_packages)
 
 # Bioconductor
